@@ -1,4 +1,4 @@
-module github.com/berttejeda/yamlcli
+module github.com/berttejeda/bert.yamlcli
 
 go 1.22.6
 

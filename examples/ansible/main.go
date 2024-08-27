@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/berttejeda/yamlcli/ansible"
+	"github.com/berttejeda/bert.yamlcli/ansible"
 	"os"
 )
 
