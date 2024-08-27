@@ -8,6 +8,8 @@ import (
 )
 
 func mergeOptions(commandOptions, commandOptionsGlobal map[any]any) map[any]any {
+
+	// Create a new map to hold the merged Options data
 	result := make(map[any]any)
 
 	// Copy all key-value pairs from commandOptions to result
