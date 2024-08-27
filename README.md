@@ -15,7 +15,7 @@ package main
 
 import (
   "fmt"
-  "github.com/berttejeda/yamlcli"
+  "github.com/berttejeda/bert.yamlcli/ansible"
   logger "github.com/sirupsen/logrus"
 )
 
