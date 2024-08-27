@@ -1,0 +1,188 @@
+### The hosts block
+- hosts: "{{ playbook_targets | default('localhost') }}"
+  gather_facts: true
+  become: true
+  ### The vars block  
+  vars:
+#    ANSIBLE_STDOUT_CALLBACK: community.general.yaml
+#    var1: "This is value1"
+#    var2: value2
+#    var3: value3
+#    var4: |-
+#      This is a multi-line value
+#      of type string
+#    var5:
+#      - listvalue1
+#      - listvalue2
+#      - listvalue3
+#      - listvalue4
+#    var6:
+#      some_key:
+#        some_child_key: "do it"
+#    var7: $(echo some_value)
+#    var8: 8000
+#    dbhosts:
+#      - dbhost1
+#      - dbhost2
+#      - dbhost3
+#    webhosts:
+#      - webhost1
+#      - webhost2
+#      - webhost3
+#    ### Global Options Block
+#    globals:
+#      options:
+#          my_global_option:
+#            help: "This is my global option"
+#            short: "g"
+#            long: global
+#            var: some_global_variable
+    ### The commands block
+    commands:
+      run:
+        options:
+          foo:
+            help: |-
+              This is some foo option, with valid choices being
+              foo1,foo2
+            short: "f"
+            long: foo
+            type: string
+            var: some_foo_variable
+            required: True
+            not_required_if: 
+              - some_bar_variable
+            choices:
+              - foo1
+              - foo2
+          bar:
+            help: "This is some bar option"
+            short: "b"
+            long: bar 
+            type: string
+            var: some_bar_variable
+            required: False
+            required_if: 
+              - hello
+              - some_baz_variable
+          baz:
+            help: "This is some baz option"
+            short: "z"
+            long: baz
+            type: string
+            var: some_baz_variable
+            required: False
+            mutually_exclusive_with: 
+              - some_bar_variable
+              - some_foo_variable
+          envvar:
+            help: "The value for this argument can be derived from an Environmental Variable"
+            short: "E"
+            long: env-var
+            type: string
+            var: env_var
+            env_var: SOME_ENVIRONMENT_VARIABLE
+            env_var_show: True
+            default: my_env_var
+          num:
+            help: "This is a numeric argument"
+            short: "n"
+            long: number
+            var: some_num_variable
+            type: int
+            required: False
+          targets:
+            help: "Playbook targets"
+            short: "t"
+            long: targets
+            type: string
+            var: playbook_targets
+            required: False
+          multiple:
+            help: |-
+              This option can be specified multiple times
+            short: "m"
+            long: multiple
+            type: string
+            var: multiple_arg
+            allow_multiple: True
+          some_switch:
+            help: |-
+              This is some boolean option, behaves like Click's switches,
+              holds the value of True if specified
+              see: https://github.com/pallets/click
+            short: "s"
+            long: some-switch
+            type: bool
+            var: some_switch
+            required: False
+          # say_hello:
+          #   help: "Invoke the 'hello' embedded shell function"
+          #   short: hello
+          #   long: say-hello
+          #   type: string
+          #   var: hello
+          #   type: bool
+          # say_goodbye:
+          #   help: "Invoke the 'goodbye' embedded shell function"
+          #   short: goodbye
+          #   long: say-goodbye
+          #   type: string
+          #   var: goodbye
+          #   type: bool
+          # hidden_option:
+          #   help: "This is a hidden option"
+          #   short: O
+          #   long: hidden-option
+          #   is_hidden: True
+          #   type: string
+          #   var: hidden
+          #   type: bool            
+          # verbose:
+          #   help: |-
+          #     This is a sample paramter that supports counting, as with:
+          #     -v, -vv, -vvv, which would evaluate to 1, 2, and 3, respectively
+          #   short: v
+          #   allow_counting: True
+          #   var: verbosity       
+        ### The help message
+        help:
+          message: |
+            Invoke the ${__command__} command 
+          epilog: |
+            This line will be displayed at the end of the help text message
+          examples:
+            - example1: |
+                tasks $__command__
+            - example2: |
+                Usage example 2
+        ### Embedded shell functions
+        functions:
+          hello:
+            shell: bash
+            help: Say hello
+            source: |-
+              echo Hello! The value for var1 is $var1
+          goodbye:
+            shell: bash
+            help: Say goodbye
+            source: |-
+              echo The value for var1 is $var1. Goodbye!
+    ### Inventory expression
+    inventory_expression: |
+      [local]
+      localhost ansible_connection=local
+      [web_hosts]
+      $(echo -e "${webhosts}" | jq -r '.[]')
+      [db_hosts]
+      $(echo -e "${dbhosts}"  | jq -r '.[]')
+      [myhosts:children]
+      web_hosts
+      db_hosts            
+  tasks:
+
+    - name: Show Variables
+      debug:
+        msg: |-
+          {{ hostvars[inventory_hostname] | to_nice_json }}
+          
