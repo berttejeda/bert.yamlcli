@@ -28,5 +28,5 @@ func main() {
 
 # Examples
 
-Consult the [examples](directory)
+Consult the [examples](examples) directory.
 
