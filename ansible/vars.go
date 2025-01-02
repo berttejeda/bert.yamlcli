@@ -75,7 +75,7 @@ func sanitizeInput(value interface{}) string {
 	}
 }
 
-func MakeAnsibleScript(args map[string]interface{}, config []Config, cliArguments map[string]string) string {
+func MakeAnsibleScript(args map[string]interface{}, config []Config, cliArguments map[string]string) (string, []KeyValue, string) {
 
 	funcs := map[string]any{
 		"contains":      strings.Contains,
@@ -102,36 +102,18 @@ CYAN=$(echo -en '')
 LIGHTGRAY=$(echo -en '')
 
 {{- range . }}
-
-{{- if ne .Key "script_vars" }}
-{{ .Key }}={{ .Value }}
-{{- else }}
-{{- range $nestedKey,$nestedValue := .Value }}
-{{- range $key,$value := $nestedValue }}
-
-{{- $isAnsibleEnvVariable := hasPrefix $key "ANSIBLE_" }}
-
-{{- if $isAnsibleEnvVariable }}
-export {{ $key }}={{ sanitizeInput $value }}
-{{- else }}
-{{ $key }}={{ sanitizeInput $value }}
-{{- end }}
-
-{{- end }}
-{{- end }}
-{{- end }}
-
+# Ordered Variables
 {{- $valueType := getType .Value }}
+{{- $isAnsibleEnvVariable := hasPrefix .Key "ANSIBLE_" }}
+{{- if $isAnsibleEnvVariable }}
+export {{ .Key }}={{ sanitizeInput .Value }}
+{{- else }}
+{{ .Key }}={{ sanitizeInput .Value }}
+{{- end }}
 
-{{- if eq .Key "script_vars" }}
-{{- range $nestedKey,$nestedValue := .Value }}
-{{- range $key,$value := $nestedValue }}
-{{- if eq $key "pre_execution" }}
+{{- if eq .Key "pre_execution" }}
 # Pre-Execution
-{{ $value }}
-{{- end }}
-{{- end }}
-{{- end }}
+{{ .Value }}
 {{- end }}
 
 {{- end }}
@@ -141,27 +123,16 @@ ansible-playbook \
 ${__ansible_run_flags__} \
 -i "${__inventory__}" \
 {{- range . }}
-{{- if ne .Key "script_vars" }}
 -e "{'{{ .Key }}':'${{ .Key }}'}" \
-{{- else }}
-{{- range $nestedKey,$nestedValue := .Value }}
-{{- range $key,$value := $nestedValue }}
--e "{'{{ $key }}':'${{ $key }}'}" \
-{{- end }}
-{{- end }}
-{{- end }}
 {{- end }}
 ${__playbook__} -l ${playbook_targets}
-
 `
 	logger.Debug(cliArguments)
-	var pairs []KeyValue
-	pairs = append(pairs, KeyValue{"__command__", args["command"]})
-	//inventoryFile, inventoryFileSpecified := args["inventory_file"]
-	//if inventoryFileSpecified {
-	//	pairs = append(pairs, KeyValue{"_inventory_", inventoryFile})
-	//}
-	pairs = append(pairs, KeyValue{"__playbook__", args["playbook"]})
+	var ansibleScriptWrapperFile string = ""
+	var ansibleScriptOptions []KeyValue
+	var existingKeys []string
+	ansibleScriptOptions = append(ansibleScriptOptions, KeyValue{"__command__", args["command"]})
+	ansibleScriptOptions = append(ansibleScriptOptions, KeyValue{"__playbook__", args["playbook"]})
 	for _, v := range cliArguments {
 		// Split only if "=" exists
 		index := strings.Index(v, "=")
@@ -171,21 +142,39 @@ ${__playbook__} -l ${playbook_targets}
 			if strings.HasPrefix(value, "=") {
 				value = strings.TrimPrefix(value, "=")
 			}
-			pairs = append(pairs, KeyValue{key, value})
+			existingKeys = append(existingKeys, key)
+			if key == "__wrapper_file__" {
+				ansibleScriptWrapperFile = value
+			} else {
+				ansibleScriptOptions = append(ansibleScriptOptions, KeyValue{key, value})
+			}
 		}
 	}
 	for k, v := range config[0].Vars {
 		if k == "commands" || k == "globals" {
 			continue
-		} else {
-			pairs = append(pairs, KeyValue{k, v})
+		} else if k == "__ordered_vars__" {
+			for _, orderedVarValue := range v.([]interface{}) {
+				for orderedSubVarKey, orderedSubVarValue := range orderedVarValue.(map[string]interface{}) {
+					if orderedSubVarKey == "__wrapper_file__" && ansibleScriptWrapperFile == "" {
+						ansibleScriptWrapperFile = orderedSubVarValue.(string)
+					}
+					if StringArrayContains(existingKeys, orderedSubVarKey) {
+						continue
+					} else {
+						ansibleScriptOptions = append(ansibleScriptOptions, KeyValue{orderedSubVarKey, orderedSubVarValue})
+					}
+				}
+
+			}
 		}
 	}
+
 	tmpl := template.Must(template.New("AnsibleVars").Funcs(funcs).Parse(tpl))
 	var tmplResult bytes.Buffer
-	err := tmpl.Execute(&tmplResult, pairs)
+	err := tmpl.Execute(&tmplResult, ansibleScriptOptions)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return tmplResult.String()
+	return tmplResult.String(), ansibleScriptOptions, ansibleScriptWrapperFile
 }

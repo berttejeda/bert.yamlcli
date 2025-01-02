@@ -119,27 +119,6 @@ func checkCLIArgProvided(cliArgs map[string]string, long string, short string) b
 	return false
 }
 
-func containsChoice(arr []any, target string) (bool, error) {
-	for _, choice := range arr {
-		// Use type assertion to check if v is a string
-		switch choice.(type) {
-		case int:
-			comparison, err := strconv.Atoi(target)
-			if choice.(int) == comparison && err == nil {
-				return true, nil
-			}
-		case string:
-			if choice == target {
-				return true, nil
-			}
-		default:
-			err := fmt.Errorf("Invalid type for %v, supported types are string, int", choice)
-			return false, err
-		}
-	}
-	return false, nil
-}
-
 func formatChoices(x interface{}) string {
 	var validChoices = "["
 	for _, choice := range x.([]interface{}) {
@@ -215,7 +194,7 @@ func printUsage(cmd string, cmdMap map[string]any) {
 }
 
 // Entry point
-func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[string]string, string) {
+func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[string]string, string, []KeyValue, string) {
 
 	// Read the YAML configuration file
 	data, err := ioutil.ReadFile(playbook)
@@ -274,6 +253,6 @@ func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[str
 		"command":  command,
 		"playbook": playbook,
 	}
-	ansibleScript := MakeAnsibleScript(ansibleScriptArgs, config, cliArgs)
-	return command, cliArgs, ansibleScript
+	ansibleScript, ansibleScriptOptions, ansibleScriptWrapperFile := MakeAnsibleScript(ansibleScriptArgs, config, cliArgs)
+	return command, cliArgs, ansibleScript, ansibleScriptOptions, ansibleScriptWrapperFile
 }
