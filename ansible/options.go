@@ -12,6 +12,7 @@ type Option struct {
 	Variable string
 	Required bool
 	TypeOf   string
+	Choices  []any
 }
 
 func ParseCmdOptions(cmdName string, commandsObjAttributes map[string]any, globalOptionsObjAttributes map[string]any) map[string]any {
@@ -73,22 +74,24 @@ func ParseCmdOptions(cmdName string, commandsObjAttributes map[string]any, globa
 			optionLong, optionLongExists := optionData["long"].(string)
 			logger.Debug(optionLong)
 			if !optionLongExists {
-				logger.Error(fmt.Sprintf("Skipping '%s' as no long option exists for this flag", optionKey))
-				continue
+				logger.Debug(fmt.Sprintf("%s.'%s' - no long option exists for this flag", cmdName, optionKey))
 			}
 			longOption := optionLong
 			optionObj.Long = longOption
 			short, shortExists := optionData["short"].(string)
 			logger.Debug(short)
 			if !shortExists {
-				logger.Error(fmt.Sprintf("Skipping '%s' as no short option exists for this flag", optionKey))
-				continue
+				logger.Debug(fmt.Sprintf("'%s.%s' - no short option exists for this flag", cmdName, optionKey))
 			}
 			shortOption := short
 			optionObj.Short = shortOption
+			if longOption == "" && shortOption == "" {
+				logger.Error(fmt.Sprintf("Skipping '%s.%s', as no long or short option exists for this flag", cmdName, optionKey))
+				continue
+			}
 			optionType, optionTypePresent := optionData["type"].(string)
 			if !optionTypePresent {
-				logger.Error(fmt.Sprintf("Skipping '%s' as no type data exists for this flag", optionKey))
+				logger.Error(fmt.Sprintf("Skipping '%s.%s' as no type data exists for this flag", cmdName, optionKey))
 				continue
 			}
 			optionObj.TypeOf = optionType
@@ -104,8 +107,13 @@ func ParseCmdOptions(cmdName string, commandsObjAttributes map[string]any, globa
 			} else {
 				optionObj.Required = optionRequired
 			}
+			optionChoices, optionChoicesPresent := optionData["choices"].([]any)
+			if optionChoicesPresent {
+				optionObj.Choices = optionChoices
+			}
 			optionObj.Help = optionHelp
 			cmdOptions[optionKey] = optionObj
+
 		}
 	}
 

@@ -12,6 +12,12 @@ import (
 	"text/template"
 )
 
+// Convert map to slice of key-value pairs
+type KeyValue struct {
+	Key   string
+	Value any
+}
+
 // Recursive function to convert map[interface{}]interface{} to map[string]interface{}
 func convertMap(m interface{}) interface{} {
 	switch v := m.(type) {
@@ -38,10 +44,15 @@ func sanitizeInput(value interface{}) string {
 		if strings.Contains(v, "\n") {
 			return "$(cat <<EOF\n" + v + "\nEOF\n)"
 		} else {
-			return v
+			jsonData, err := json.Marshal(strings.TrimRight(v, " \n\r"))
+			if err != nil {
+				fmt.Println("Error marshaling JSON:", err)
+				return ""
+			}
+			return string(jsonData)
 		}
 	case int:
-		return strconv.Itoa(v)
+		return strings.TrimRight(strconv.Itoa(v), " \n\r")
 	// Add whatever other types you need
 	case []interface{}:
 		jsonData, err := json.Marshal(v)
@@ -64,7 +75,7 @@ func sanitizeInput(value interface{}) string {
 	}
 }
 
-func MakeCLIVarsFromAnsiblePlaybook(config []Config, cliArguments map[string]interface{}) map[string]any {
+func MakeAnsibleScript(args map[string]interface{}, config []Config, cliArguments map[string]string) string {
 
 	funcs := map[string]any{
 		"contains":      strings.Contains,
@@ -73,26 +84,108 @@ func MakeCLIVarsFromAnsiblePlaybook(config []Config, cliArguments map[string]int
 		"hasPrefix":     strings.HasPrefix,
 		"hasSuffix":     strings.HasSuffix,
 		"sanitizeInput": sanitizeInput,
+		"nullString": func(input string) (string, error) {
+			return "", nil
+		},
 	}
 
-	tpl := `
-{{- range $k, $v := $.Vars }}
-{{- $isAnsibleEnvVariable := hasPrefix $k "ANSIBLE_" }}
-{{- $valueType := getType $v }}
-{{- if $isAnsibleEnvVariable }}
-export {{ $k }}={{ sanitizeInput $v -}}
+	tpl := `#!/usr/bin/env bash
+# ANSI Colors
+RESTORE=$(echo -en '')
+RED=$(echo -en '')
+GREEN=$(echo -en '')
+YELLOW=$(echo -en '')
+BLUE=$(echo -en '')
+MAGENTA=$(echo -en '')
+PURPLE=$(echo -en '')
+CYAN=$(echo -en '')
+LIGHTGRAY=$(echo -en '')
+
+{{- range . }}
+
+{{- if ne .Key "script_vars" }}
+{{ .Key }}={{ .Value }}
 {{- else }}
-{{ $k }}={{ sanitizeInput $v }}
+{{- range $nestedKey,$nestedValue := .Value }}
+{{- range $key,$value := $nestedValue }}
+
+{{- $isAnsibleEnvVariable := hasPrefix $key "ANSIBLE_" }}
+
+{{- if $isAnsibleEnvVariable }}
+export {{ $key }}={{ sanitizeInput $value }}
+{{- else }}
+{{ $key }}={{ sanitizeInput $value }}
+{{- end }}
+
 {{- end }}
 {{- end }}
+{{- end }}
+
+{{- $valueType := getType .Value }}
+
+{{- if eq .Key "script_vars" }}
+{{- range $nestedKey,$nestedValue := .Value }}
+{{- range $key,$value := $nestedValue }}
+{{- if eq $key "pre_execution" }}
+# Pre-Execution
+{{ $value }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{- end }}
+
+# Ansible Command(s)
+ansible-playbook \
+${__ansible_run_flags__} \
+-i "${__inventory__}" \
+{{- range . }}
+{{- if ne .Key "script_vars" }}
+-e "{'{{ .Key }}':'${{ .Key }}'}" \
+{{- else }}
+{{- range $nestedKey,$nestedValue := .Value }}
+{{- range $key,$value := $nestedValue }}
+-e "{'{{ $key }}':'${{ $key }}'}" \
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
+${__playbook__} -l ${playbook_targets}
+
 `
 	logger.Debug(cliArguments)
-	tmpl := template.Must(template.New("test").Funcs(funcs).Parse(tpl))
+	var pairs []KeyValue
+	pairs = append(pairs, KeyValue{"__command__", args["command"]})
+	//inventoryFile, inventoryFileSpecified := args["inventory_file"]
+	//if inventoryFileSpecified {
+	//	pairs = append(pairs, KeyValue{"_inventory_", inventoryFile})
+	//}
+	pairs = append(pairs, KeyValue{"__playbook__", args["playbook"]})
+	for _, v := range cliArguments {
+		// Split only if "=" exists
+		index := strings.Index(v, "=")
+		if index != -1 {
+			key := v[:index]     // Substring before the "="
+			value := v[index+1:] // Substring after the "="
+			if strings.HasPrefix(value, "=") {
+				value = strings.TrimPrefix(value, "=")
+			}
+			pairs = append(pairs, KeyValue{key, value})
+		}
+	}
+	for k, v := range config[0].Vars {
+		if k == "commands" || k == "globals" {
+			continue
+		} else {
+			pairs = append(pairs, KeyValue{k, v})
+		}
+	}
+	tmpl := template.Must(template.New("AnsibleVars").Funcs(funcs).Parse(tpl))
 	var tmplResult bytes.Buffer
-	err := tmpl.Execute(&tmplResult, config[0])
+	err := tmpl.Execute(&tmplResult, pairs)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(tmplResult.String())
-	return config[0].Vars
+	return tmplResult.String()
 }
