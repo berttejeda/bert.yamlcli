@@ -15,29 +15,47 @@ import (
 // Parse command-line arguments
 func parseArgs(cmdMap map[string]any, args []string) (string, map[string]string, error) {
 
+	// Initialize options map
+	options := make(map[string]string)
+
+	// Process Raw Args
+	rawArgsDelimiterIndex := findIndex(args, "---")
+	if rawArgsDelimiterIndex != -1 {
+		logger.Debug(fmt.Sprintf("Found raw args Delimiter (---) at index %s", rawArgsDelimiterIndex))
+		rawArgs := args[rawArgsDelimiterIndex+1:]
+		logger.Debug(fmt.Sprintf("Raw args are %s", rawArgs))
+		args = args[0:rawArgsDelimiterIndex]
+		options["__ansible_args_raw__"] = "__ansible_args_raw__="
+		for _, v := range rawArgs {
+			options["__ansible_args_raw__"] += v + " "
+		}
+	}
+
+	// Print Usage if not enough args passed in
 	if len(args) < 2 {
 		printUsage("", cmdMap)
 	}
 
+	// Initialize command variable
 	var cmd string = ""
-
 	if len(args) > 1 {
 		cmd = args[1]
 	}
 
+	// Print Usage if --help specified
 	if cmd == "--help" || cmd == "" {
 		printUsage(cmd, cmdMap)
 		os.Exit(0)
 	}
 
+	// Print Usage if command specified, but not enough args passed in
 	if len(args) < 2 {
 		printUsage(cmd, cmdMap)
 	} else if _, exists := cmdMap[cmd]; !exists {
 		printUsage(cmd, cmdMap)
 	}
 
-	options := make(map[string]string)
-
+	// Use a regular expression to match command-line flags/args
 	pattern := `^[\W]+[\w]`
 	re := regexp.MustCompile(pattern)
 	for i := 2; i < len(args); i++ {
@@ -226,7 +244,6 @@ func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[str
 	var cmdStrings = []string{""}
 	var cmdMap = make(map[string]any)
 	for cmdObjName, cmdObj := range cliCommands {
-
 		cmdString := cmdObjName
 		cmdStrings = strings.Split(cmdString, "|")
 		for _, cmdName := range cmdStrings {

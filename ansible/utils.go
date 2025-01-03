@@ -34,3 +34,12 @@ func StringArrayContains(slice []string, item string) bool {
 	}
 	return false
 }
+
+func findIndex(arr []string, target string) int {
+	for i, v := range arr {
+		if v == target {
+			return i // Return the index if the item is found
+		}
+	}
+	return -1 // Return -1 if the item is not found
+}

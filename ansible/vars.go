@@ -118,7 +118,8 @@ export {{ .Key }}={{ sanitizeInput .Value }}
 {{- end }}
 # Ansible Command(s)
 ansible-playbook \
-${__ansible_run_flags__} \
+${__ansible_args_raw__} \
+${__ansible_args_extra__} \
 -i "${__inventory__}" \
 {{- range . }}
 -e "{'{{ .Key }}':'${{ .Key }}'}" \
