@@ -115,9 +115,7 @@ export {{ .Key }}={{ sanitizeInput .Value }}
 # Pre-Execution
 {{ .Value }}
 {{- end }}
-
 {{- end }}
-
 # Ansible Command(s)
 ansible-playbook \
 ${__ansible_run_flags__} \
