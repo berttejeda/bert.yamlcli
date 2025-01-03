@@ -14,11 +14,13 @@ import (
 
 // Parse command-line arguments
 func parseArgs(cmdMap map[string]any, args []string) (string, map[string]string, error) {
+
 	if len(args) < 2 {
 		printUsage("", cmdMap)
 	}
 
 	var cmd string = ""
+
 	if len(args) > 1 {
 		cmd = args[1]
 	}
@@ -27,6 +29,7 @@ func parseArgs(cmdMap map[string]any, args []string) (string, map[string]string,
 		printUsage(cmd, cmdMap)
 		os.Exit(0)
 	}
+
 	if len(args) < 2 {
 		printUsage(cmd, cmdMap)
 	} else if _, exists := cmdMap[cmd]; !exists {
@@ -53,7 +56,7 @@ func parseArgs(cmdMap map[string]any, args []string) (string, map[string]string,
 			}
 			for k, v := range cmdMap[cmd].(map[string]interface{}) {
 				// Define the regular expression
-				pattern := fmt.Sprintf("^%s$|^%s$", regexp.QuoteMeta(v.(*Option).Short), regexp.QuoteMeta(v.(*Option).Long))
+				pattern := fmt.Sprintf("^%s$|^%s$|^--help$", regexp.QuoteMeta(v.(*Option).Short), regexp.QuoteMeta(v.(*Option).Long))
 				regex := regexp.MustCompile(pattern)
 				// Check if the string matches the regex
 				if regex.MatchString(key) {
@@ -170,6 +173,11 @@ func printUsage(cmd string, cmdMap map[string]any) {
 
 	fmt.Println("Usage:")
 	for cmdKey, cmdOptions := range cmdMap {
+		if cmd != "" {
+			if cmdKey != cmd {
+				continue
+			}
+		}
 		fmt.Printf("  %s\t\n", cmdKey)
 		var maxShort, maxLong int
 		for _, cmdOption := range cmdOptions.(map[string]any) {
