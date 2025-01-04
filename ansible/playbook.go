@@ -4,7 +4,6 @@ import (
 	"fmt"
 	logger "github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v3"
-	"io/ioutil"
 	"log"
 	"os"
 	"regexp"
@@ -21,7 +20,7 @@ func parseArgs(cmdMap map[string]any, args []string) (string, map[string]string,
 	// Process Raw Args
 	rawArgsDelimiterIndex := findIndex(args, "---")
 	if rawArgsDelimiterIndex != -1 {
-		logger.Debug(fmt.Sprintf("Found raw args Delimiter (---) at index %s", rawArgsDelimiterIndex))
+		logger.Debug(fmt.Sprintf("Found raw args Delimiter (---) at index %v", rawArgsDelimiterIndex))
 		rawArgs := args[rawArgsDelimiterIndex+1:]
 		logger.Debug(fmt.Sprintf("Raw args are %s", rawArgs))
 		args = args[0:rawArgsDelimiterIndex]
@@ -37,7 +36,7 @@ func parseArgs(cmdMap map[string]any, args []string) (string, map[string]string,
 	}
 
 	// Initialize command variable
-	var cmd string = ""
+	var cmd string
 	if len(args) > 1 {
 		cmd = args[1]
 	}
@@ -158,14 +157,14 @@ func formatChoices(x interface{}) string {
 func checkCLIArgChoices(cliArgs map[string]string, validChoices []any, long string, short string) ([]any, bool, error) {
 	longCLIArg, longCLIArgProvided := cliArgs[long]
 	shortCLIArg, shortCLIArgProvided := cliArgs[short]
-	var choices = []any{}
+	var choices []any
 	if longCLIArgProvided {
 		choices = []any{longCLIArg}
 	} else if shortCLIArgProvided {
 		choices = []any{shortCLIArg}
 	}
 	for _, choice := range choices {
-		// Check whether or not the choice provided from the command-line is present in the list of valid choices
+		// Check whether the choice provided from the command-line is present in the list of valid choices
 		validChoice, err := containsChoice(validChoices, choice.(string))
 		if err != nil {
 			return []any{}, false, err
@@ -219,11 +218,11 @@ func printUsage(cmd string, cmdMap map[string]any) {
 	}
 }
 
-// Entry point
+// MakeCLIFromAnsiblePlaybook Entry point
 func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[string]string, string, []KeyValue, string) {
 
 	// Read the YAML configuration file
-	data, err := ioutil.ReadFile(playbook)
+	data, err := os.ReadFile(playbook)
 	if err != nil {
 		log.Fatalf("Failed to read config file: %v", err)
 	}
@@ -260,7 +259,7 @@ func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[str
 
 	command, cliArgs, err := parseArgs(cmdMap, args)
 	if err != nil {
-		logger.Fatal(fmt.Sprintf("Error:", err))
+		logger.Fatal(fmt.Sprintf("Error: %s", err))
 	}
 
 	if _, exists := cliArgs["--help"]; exists {
