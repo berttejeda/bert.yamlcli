@@ -185,7 +185,6 @@ func checkCLIArgChoices(cliArgs map[string]string, validChoices []any, long stri
 func printUsage(cmd string, cmdMap map[string]any, cmdMapHelp map[string]any) {
 
 	_, exists := cmdMap[cmd]
-	var cmdUsageObjects []cmdUsageMap
 	if !exists && (cmd != "-h" && cmd != "--help") && cmd != "" {
 		fmt.Printf("Unknown command %s\n", cmd)
 		return
@@ -205,10 +204,12 @@ Options:
 {{- end }}
 {{- end }} 
 {{- end }}
+
 `
 	fmt.Println("Usage:")
 	spacing := GetOptionsMaxLength(cmdMap)
 	for cmdKey, cmdOptions := range cmdMap {
+		var cmdUsageObjects []cmdUsageMap
 		if cmd != "" {
 			if cmdKey != cmd {
 				continue
@@ -217,7 +218,6 @@ Options:
 		helpVars := map[string]interface{}{
 			"__command__": cmdKey,
 		}
-		//var cmdUsageExample string
 		var helpExample string
 		var helpMessage string
 		var cmdUsageExample string
@@ -238,41 +238,6 @@ Options:
 		} else {
 			helpExample = ""
 		}
-		//		cmdUsageVars := map[string]interface{}{
-		//			"__command__": cmdKey,
-		//		}
-		//		cmdUsageTemplate := `{{ .__command__ }}
-		//`
-		//		cmdUsageExample, err = templatizeMap(cmdUsageTemplate, "cmdUsage", cmdUsageVars)
-		//if err != nil {
-		//	logger.Fatal(fmt.Sprintf("Failed to print command usage %v", err))
-		//}
-		//cmdUsageMap = append(cmdUsageMap, KeyValue{cmdKey, args["command"]})
-		//helpExamples := cmdMap[cmdKey+".help"].(map[string]interface{})["install"].(*HelpOption).Examples
-		//fmt.Printf("\n %s: %s\n", cmdKey, helpMessage)
-		//if helpExample != "" {
-		//	fmt.Printf(" Example: %s", helpExample)
-		//}
-		////fmt.Printf(" Options:\n")
-		//var maxShort, maxLong int
-		//for _, cmdOption := range cmdOptions.(map[string]any) {
-		//	cmdOptionLong := cmdOption.(*Option).Long
-		//	cmdOptionShort := cmdOption.(*Option).Short
-		//	cmdOptionRequired := cmdOption.(*Option).Required
-		//	isRequired := ""
-		//	if cmdOptionRequired {
-		//		isRequired = "(Required)"
-		//	}
-		//	if len(cmdOptionShort) > maxShort {
-		//		maxShort = len(cmdOptionShort)
-		//	}
-		//	if len(cmdOptionLong) > maxLong {
-		//		maxLong = len(cmdOptionLong)
-		//	}
-		//	format := fmt.Sprintf(" %%-%ds  %%-%ds  %%s %%s\n", maxShort, maxLong)
-		//	cmdOptionHelp := cmdOption.(*Option).Help
-		//	fmt.Printf(format, cmdOptionShort, cmdOptionLong, cmdOptionHelp, isRequired)
-		//}
 		cmdUsageObjects = append(cmdUsageObjects, cmdUsageMap{cmdKey, helpMessage, helpExample, cmdOptions, spacing})
 		cmdUsageExample, err = templatizeArrayOfCmdUsageMaps(cmdUsageTemplate, "cmdUsage", cmdUsageObjects)
 		if err != nil {

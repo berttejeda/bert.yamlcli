@@ -163,6 +163,9 @@ func ParseCmdOptions(cmdName string, commandsObjAttributes map[string]any, globa
 			}
 			// Populate the corresponding cmdOptions key
 			optionObj.OptionsSpacing = len(longOption + shortOption)
+			if longOption == "--ansible-connection-password" {
+				logger.Debug("ok")
+			}
 			cmdOptions[optionKey] = optionObj
 		}
 	}
