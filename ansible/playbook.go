@@ -16,7 +16,6 @@ func parseArgs(cmdMap map[string]any, cmdMapHelp map[string]any, args []string) 
 
 	// Initialize options map
 	options := make(map[string]string)
-
 	// Process Raw Args
 	rawArgsDelimiterIndex := findIndex(args, "---")
 	if rawArgsDelimiterIndex != -1 {
@@ -248,7 +247,7 @@ Options:
 }
 
 // MakeCLIFromAnsiblePlaybook Entry point
-func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[string]string, string, []KeyValue, string) {
+func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[string]string, string, []KeyValue, string, bool) {
 
 	// Read the YAML configuration file
 	data, err := os.ReadFile(playbook)
@@ -268,7 +267,6 @@ func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[str
 	if !commandsObjExists {
 		logger.Fatal("Invalid playbook structure - no commands key found")
 	}
-	logger.Debug(globalOptionsObj, globalOptionsObjExists)
 	var cmdStrings = []string{""}
 	var cmdMap = make(map[string]any)
 	var cmdMapHelp = make(map[string]any)
@@ -286,7 +284,12 @@ func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[str
 			cmdMap[cmdName], cmdMapHelp[cmdName+".help"] = ParseCmdOptions(cmdName, commandsObjAttributes, globalOptionsObjAttributes)
 		}
 	}
-
+	// Process special @echo flag
+	var echoOn bool
+	echoFlag := findIndex(args, "@echo")
+	if echoFlag != -1 {
+		echoOn = true
+	}
 	command, cliArgs, err := parseArgs(cmdMap, cmdMapHelp, args)
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("Error: %s", err))
@@ -308,5 +311,5 @@ func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[str
 		"playbook": playbook,
 	}
 	ansibleScript, ansibleScriptOptions, ansibleScriptWrapperFile := MakeAnsibleScript(ansibleScriptArgs, config, cliArgs)
-	return command, cliArgs, ansibleScript, ansibleScriptOptions, ansibleScriptWrapperFile
+	return command, cliArgs, ansibleScript, ansibleScriptOptions, ansibleScriptWrapperFile, echoOn
 }
