@@ -12,7 +12,7 @@ import (
 )
 
 // Parse command-line arguments
-func parseArgs(cmdMap map[string]any, args []string) (string, map[string]string, error) {
+func parseArgs(cmdMap map[string]any, cmdMapHelp map[string]any, args []string) (string, map[string]string, error) {
 
 	// Initialize options map
 	options := make(map[string]string)
@@ -32,7 +32,7 @@ func parseArgs(cmdMap map[string]any, args []string) (string, map[string]string,
 
 	// Print Usage if not enough args passed in
 	if len(args) < 2 {
-		printUsage("", cmdMap)
+		printUsage("", cmdMap, cmdMapHelp)
 	}
 
 	// Initialize command variable
@@ -43,15 +43,16 @@ func parseArgs(cmdMap map[string]any, args []string) (string, map[string]string,
 
 	// Print Usage if --help specified
 	if cmd == "--help" || cmd == "" {
-		printUsage(cmd, cmdMap)
+		cmd = ""
+		printUsage(cmd, cmdMap, cmdMapHelp)
 		os.Exit(0)
 	}
 
 	// Print Usage if command specified, but not enough args passed in
 	if len(args) < 2 {
-		printUsage(cmd, cmdMap)
+		printUsage(cmd, cmdMap, cmdMapHelp)
 	} else if _, exists := cmdMap[cmd]; !exists {
-		printUsage(cmd, cmdMap)
+		printUsage(cmd, cmdMap, cmdMapHelp)
 	}
 
 	// Use a regular expression to match command-line flags/args
@@ -73,6 +74,9 @@ func parseArgs(cmdMap map[string]any, args []string) (string, map[string]string,
 			}
 			for k, v := range cmdMap[cmd].(map[string]interface{}) {
 				// Define the regular expression
+				if k == "__help__" {
+					continue
+				}
 				pattern := fmt.Sprintf("^%s$|^%s$|^--help$", regexp.QuoteMeta(v.(*Option).Short), regexp.QuoteMeta(v.(*Option).Long))
 				regex := regexp.MustCompile(pattern)
 				// Check if the string matches the regex
@@ -92,10 +96,9 @@ type Config struct {
 }
 
 // Validate the parsed options against the command definition
-func validateOptions(command string, cmdMap map[string]any, cliArgs map[string]string) error {
+func validateOptions(command string, cmdMap map[string]any, cmdMapHelp map[string]any, cliArgs map[string]string) error {
 
-	for cmdKey, cmdOptions := range cmdMap {
-		logger.Debug(cmdKey)
+	for _, cmdOptions := range cmdMap {
 		for _, cmdOption := range cmdOptions.(map[string]any) {
 			cmdOptionLong := cmdOption.(*Option).Long
 			cmdOptionShort := cmdOption.(*Option).Short
@@ -104,7 +107,7 @@ func validateOptions(command string, cmdMap map[string]any, cliArgs map[string]s
 			cliArgProvided := checkCLIArgProvided(cliArgs, cmdOptionLong, cmdOptionShort)
 			if cmdOptionRequired {
 				if !cliArgProvided {
-					printUsage(command, cmdMap)
+					printUsage(command, cmdMap, cmdMapHelp)
 					if cmdOptionLong != "" && cmdOptionShort != "" {
 						errMsg := fmt.Sprintf("Missing required option: %s|%s, see usage above", cmdOptionLong, cmdOptionShort)
 						return fmt.Errorf(errMsg)
@@ -179,42 +182,103 @@ func checkCLIArgChoices(cliArgs map[string]string, validChoices []any, long stri
 }
 
 // Print usage for a specific command
-func printUsage(cmd string, cmdMap map[string]any) {
+func printUsage(cmd string, cmdMap map[string]any, cmdMapHelp map[string]any) {
 
 	_, exists := cmdMap[cmd]
-
+	var cmdUsageObjects []cmdUsageMap
 	if !exists && (cmd != "-h" && cmd != "--help") && cmd != "" {
 		fmt.Printf("Unknown command %s\n", cmd)
 		return
 	}
 
+	cmdUsageTemplate := `{{- range . }}
+{{- $Spacing := .Spacing }}
+{{ .Command }}: {{ .Help }}
+Options:
+{{- range $key, $value := .CommandOptions }}
+{{- if and (ne $value.Long  "") (ne $value.Short  "") }}
+{{ padCLIOptions $Spacing $value.Long $value.Short $value.Help }}
+{{- else if ne $value.Long  "" }}
+{{ padCLIOptions $Spacing $value.Long "" $value.Help }}
+{{- else if ne $value.Short  "" }}
+{{ padCLIOptions $Spacing "" $value.Short $value.Help }}
+{{- end }}
+{{- end }} 
+{{- end }}
+`
 	fmt.Println("Usage:")
+	spacing := GetOptionsMaxLength(cmdMap)
 	for cmdKey, cmdOptions := range cmdMap {
 		if cmd != "" {
 			if cmdKey != cmd {
 				continue
 			}
 		}
-		fmt.Printf("  %s\t\n", cmdKey)
-		var maxShort, maxLong int
-		for _, cmdOption := range cmdOptions.(map[string]any) {
-			cmdOptionLong := cmdOption.(*Option).Long
-			cmdOptionShort := cmdOption.(*Option).Short
-			cmdOptionRequired := cmdOption.(*Option).Required
-			isRequired := ""
-			if cmdOptionRequired {
-				isRequired = "(Required)"
-			}
-			if len(cmdOptionShort) > maxShort {
-				maxShort = len(cmdOptionShort)
-			}
-			if len(cmdOptionLong) > maxLong {
-				maxLong = len(cmdOptionLong)
-			}
-			format := fmt.Sprintf("  %%-%ds  %%-%ds  %%s %%s\n", maxShort, maxLong)
-			cmdOptionHelp := cmdOption.(*Option).Help
-			fmt.Printf(format, cmdOptionShort, cmdOptionLong, cmdOptionHelp, isRequired)
+		helpVars := map[string]interface{}{
+			"__command__": cmdKey,
 		}
+		//var cmdUsageExample string
+		var helpExample string
+		var helpMessage string
+		var cmdUsageExample string
+		var err error
+		helpMessageObj := cmdMapHelp[cmdKey+".help"]
+		if helpMessageObj != nil {
+			helpMessageTemplate := cmdMapHelp[cmdKey+".help"].(map[string]interface{})[cmdKey].(*HelpOption).Message
+			helpMessage, err = templatizeMap(helpMessageTemplate, "helpMessage", helpVars)
+			if err != nil {
+				logger.Debug(fmt.Sprintf("%v", err))
+			}
+			helpExampleTemplate := helpMessageObj.(map[string]interface{})[cmdKey].(*HelpOption).Example
+			helpExample, err = templatizeMap(helpExampleTemplate, "helpMessage", helpVars)
+			if err != nil {
+				logger.Warning(fmt.Sprintf("%v", err))
+				helpExample = ""
+			}
+		} else {
+			helpExample = ""
+		}
+		//		cmdUsageVars := map[string]interface{}{
+		//			"__command__": cmdKey,
+		//		}
+		//		cmdUsageTemplate := `{{ .__command__ }}
+		//`
+		//		cmdUsageExample, err = templatizeMap(cmdUsageTemplate, "cmdUsage", cmdUsageVars)
+		//if err != nil {
+		//	logger.Fatal(fmt.Sprintf("Failed to print command usage %v", err))
+		//}
+		//cmdUsageMap = append(cmdUsageMap, KeyValue{cmdKey, args["command"]})
+		//helpExamples := cmdMap[cmdKey+".help"].(map[string]interface{})["install"].(*HelpOption).Examples
+		//fmt.Printf("\n %s: %s\n", cmdKey, helpMessage)
+		//if helpExample != "" {
+		//	fmt.Printf(" Example: %s", helpExample)
+		//}
+		////fmt.Printf(" Options:\n")
+		//var maxShort, maxLong int
+		//for _, cmdOption := range cmdOptions.(map[string]any) {
+		//	cmdOptionLong := cmdOption.(*Option).Long
+		//	cmdOptionShort := cmdOption.(*Option).Short
+		//	cmdOptionRequired := cmdOption.(*Option).Required
+		//	isRequired := ""
+		//	if cmdOptionRequired {
+		//		isRequired = "(Required)"
+		//	}
+		//	if len(cmdOptionShort) > maxShort {
+		//		maxShort = len(cmdOptionShort)
+		//	}
+		//	if len(cmdOptionLong) > maxLong {
+		//		maxLong = len(cmdOptionLong)
+		//	}
+		//	format := fmt.Sprintf(" %%-%ds  %%-%ds  %%s %%s\n", maxShort, maxLong)
+		//	cmdOptionHelp := cmdOption.(*Option).Help
+		//	fmt.Printf(format, cmdOptionShort, cmdOptionLong, cmdOptionHelp, isRequired)
+		//}
+		cmdUsageObjects = append(cmdUsageObjects, cmdUsageMap{cmdKey, helpMessage, helpExample, cmdOptions, spacing})
+		cmdUsageExample, err = templatizeArrayOfCmdUsageMaps(cmdUsageTemplate, "cmdUsage", cmdUsageObjects)
+		if err != nil {
+			logger.Fatal(fmt.Sprintf("Failed to print command usage %v", err))
+		}
+		fmt.Println(cmdUsageExample)
 	}
 }
 
@@ -242,6 +306,7 @@ func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[str
 	logger.Debug(globalOptionsObj, globalOptionsObjExists)
 	var cmdStrings = []string{""}
 	var cmdMap = make(map[string]any)
+	var cmdMapHelp = make(map[string]any)
 	for cmdObjName, cmdObj := range cliCommands {
 		cmdString := cmdObjName
 		cmdStrings = strings.Split(cmdString, "|")
@@ -253,21 +318,21 @@ func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[str
 			} else {
 				globalOptionsObjAttributes = make(map[string]any)
 			}
-			cmdMap[cmdName] = ParseCmdOptions(cmdName, commandsObjAttributes, globalOptionsObjAttributes)
+			cmdMap[cmdName], cmdMapHelp[cmdName+".help"] = ParseCmdOptions(cmdName, commandsObjAttributes, globalOptionsObjAttributes)
 		}
 	}
 
-	command, cliArgs, err := parseArgs(cmdMap, args)
+	command, cliArgs, err := parseArgs(cmdMap, cmdMapHelp, args)
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("Error: %s", err))
 	}
 
 	if _, exists := cliArgs["--help"]; exists {
-		printUsage(command, cmdMap)
+		printUsage(command, cmdMap, cmdMapHelp)
 		os.Exit(0)
 	}
 
-	err = validateOptions(command, cmdMap, cliArgs)
+	err = validateOptions(command, cmdMap, cmdMapHelp, cliArgs)
 	if err != nil {
 		fmt.Println("Validation Error:", err)
 		os.Exit(1)

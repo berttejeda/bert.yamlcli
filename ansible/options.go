@@ -5,23 +5,30 @@ import (
 	logger "github.com/sirupsen/logrus"
 )
 
-type Option struct {
-	Help     string
-	Short    string
-	Long     string
-	Variable string
-	Required bool
-	TypeOf   string
-	Choices  []any
-	Source   string
-	Shell    string
+type HelpOption struct {
+	Message  string
+	Example  string
+	Examples []any
 }
 
-func ParseCmdOptions(cmdName string, commandsObjAttributes map[string]any, globalOptionsObjAttributes map[string]any) map[string]any {
+type Option struct {
+	Help           string
+	OptionsSpacing int
+	Short          string
+	Long           string
+	Variable       string
+	Required       bool
+	TypeOf         string
+	Choices        []any
+	Source         string
+	Shell          string
+}
+
+func ParseCmdOptions(cmdName string, commandsObjAttributes map[string]any, globalOptionsObjAttributes map[string]any) (map[string]any, map[string]any) {
 
 	optionsMap := make(map[string]map[string]any)
 	cmdOptions := make(map[string]any)
-
+	cmdOptionsHelp := make(map[string]any)
 	// Define global options
 	for globalObjAttributeName, globalOptionsObjAttributeData := range globalOptionsObjAttributes {
 
@@ -68,6 +75,21 @@ func ParseCmdOptions(cmdName string, commandsObjAttributes map[string]any, globa
 					}
 				}
 			}
+		case "help":
+			helpObj := new(HelpOption)
+			helpMessage, helpMessageExists := attributeData["message"]
+			if helpMessageExists {
+				helpObj.Message = helpMessage.(string)
+			}
+			helpExample, helpExampleExists := attributeData["example"]
+			if helpExampleExists {
+				helpObj.Example = helpExample.(string)
+			}
+			helpExamples, helpExamplesExists := attributeData["examples"]
+			if helpExamplesExists {
+				helpObj.Examples = helpExamples.([]any)
+			}
+			cmdOptionsHelp[cmdName] = helpObj
 		default:
 			continue
 		}
@@ -140,10 +162,11 @@ func ParseCmdOptions(cmdName string, commandsObjAttributes map[string]any, globa
 				optionObj.Choices = optionChoices
 			}
 			// Populate the corresponding cmdOptions key
+			optionObj.OptionsSpacing = len(longOption + shortOption)
 			cmdOptions[optionKey] = optionObj
 		}
 	}
 
-	return cmdOptions
+	return cmdOptions, cmdOptionsHelp
 
 }
