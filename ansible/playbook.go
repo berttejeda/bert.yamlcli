@@ -98,7 +98,12 @@ type Config struct {
 func validateOptions(command string, cmdMap map[string]any, cmdMapHelp map[string]any, cliArgs map[string]string) error {
 
 	for _, cmdOptions := range cmdMap {
-		for _, cmdOption := range cmdOptions.(map[string]any) {
+		for cmdKey, cmdOption := range cmdOptions.(map[string]any) {
+			if command != "" {
+				if cmdKey != command {
+					continue
+				}
+			}
 			cmdOptionLong := cmdOption.(*Option).Long
 			cmdOptionShort := cmdOption.(*Option).Short
 			cmdOptionRequired := cmdOption.(*Option).Required
