@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/Masterminds/sprig/v3"
 	"reflect"
 	"strconv"
 	"strings"
@@ -158,7 +159,7 @@ var funcs = map[string]any{
 
 func templatizeMap(tmplInput string, templateName string, templateVars map[string]any) (string, error) {
 
-	tmpl := template.Must(template.New(templateName).Funcs(funcs).Parse(tmplInput))
+	tmpl := template.Must(template.New(templateName).Funcs(funcs).Funcs(sprig.FuncMap()).Parse(tmplInput))
 	var tmplResultBuffer bytes.Buffer
 	err := tmpl.Execute(&tmplResultBuffer, templateVars)
 	if err != nil {
@@ -170,7 +171,7 @@ func templatizeMap(tmplInput string, templateName string, templateVars map[strin
 
 func templatizeArrayOfKeyVars(tmplInput string, templateName string, templateVars []KeyValue) (string, error) {
 
-	tmpl := template.Must(template.New(templateName).Funcs(funcs).Parse(tmplInput))
+	tmpl := template.Must(template.New(templateName).Funcs(funcs).Funcs(sprig.FuncMap()).Parse(tmplInput))
 	var tmplResultBuffer bytes.Buffer
 	err := tmpl.Execute(&tmplResultBuffer, templateVars)
 	if err != nil {
@@ -182,7 +183,7 @@ func templatizeArrayOfKeyVars(tmplInput string, templateName string, templateVar
 
 func templatizeArrayOfCmdUsageMaps(tmplInput string, templateName string, templateVars []cmdUsageMap) (string, error) {
 
-	tmpl := template.Must(template.New(templateName).Funcs(funcs).Parse(tmplInput))
+	tmpl := template.Must(template.New(templateName).Funcs(funcs).Funcs(sprig.FuncMap()).Parse(tmplInput))
 	var tmplResultBuffer bytes.Buffer
 	err := tmpl.Execute(&tmplResultBuffer, templateVars)
 	if err != nil {
