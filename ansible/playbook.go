@@ -252,7 +252,7 @@ Options:
 }
 
 // MakeCLIFromAnsiblePlaybook Entry point
-func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[string]string, string, []KeyValue, string, bool) {
+func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[string]string, string, []KeyValue, string) {
 
 	// Read the YAML configuration file
 	data, err := os.ReadFile(playbook)
@@ -289,12 +289,7 @@ func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[str
 			cmdMap[cmdName], cmdMapHelp[cmdName+".help"] = ParseCmdOptions(cmdName, commandsObjAttributes, globalOptionsObjAttributes)
 		}
 	}
-	// Process special @echo flag
-	var echoOn bool
-	echoFlag := findIndex(args, "@echo")
-	if echoFlag != -1 {
-		echoOn = true
-	}
+
 	command, cliArgs, err := parseArgs(cmdMap, cmdMapHelp, args)
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("Error: %s", err))
@@ -316,5 +311,5 @@ func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[str
 		"playbook": playbook,
 	}
 	ansibleScript, ansibleScriptOptions, ansibleScriptWrapperFile := MakeAnsibleScript(ansibleScriptArgs, config, cliArgs)
-	return command, cliArgs, ansibleScript, ansibleScriptOptions, ansibleScriptWrapperFile, echoOn
+	return command, cliArgs, ansibleScript, ansibleScriptOptions, ansibleScriptWrapperFile
 }

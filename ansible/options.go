@@ -169,7 +169,15 @@ func ParseCmdOptions(cmdName string, commandsObjAttributes map[string]any, globa
 			cmdOptions[optionKey] = optionObj
 		}
 	}
-
+	// Add special flags
+	specialOptionObj := new(Option)
+	specialOptionObj.Required = false
+	specialOptionObj.Help = "Dry Run"
+	specialOptionObj.TypeOf = "bool"
+	specialOptionObj.Short = "-dry"
+	specialOptionObj.Long = "--dry-run"
+	cmdOptions["__dry_run__"] = specialOptionObj
+	
 	return cmdOptions, cmdOptionsHelp
 
 }
