@@ -24,10 +24,12 @@ type Option struct {
 	Shell          string
 }
 
-func ParseCmdOptions(cmdName string, commandsObjAttributes map[string]any, globalOptionsObjAttributes map[string]any) (map[string]any, map[string]any) {
+func ParseCmdOptions(cmdName string, commandsObjAttributes map[string]any, globalOptionsObjAttributes map[string]any) (map[string]any, map[string]any, map[string]any, map[string]any) {
 
 	optionsMap := make(map[string]map[string]any)
 	cmdOptions := make(map[string]any)
+	cmdOptionsShort := make(map[string]any)
+	cmdOptionsLong := make(map[string]any)
 	cmdOptionsHelp := make(map[string]any)
 	// Define global options
 	for globalObjAttributeName, globalOptionsObjAttributeData := range globalOptionsObjAttributes {
@@ -167,6 +169,8 @@ func ParseCmdOptions(cmdName string, commandsObjAttributes map[string]any, globa
 				logger.Debug("ok")
 			}
 			cmdOptions[optionKey] = optionObj
+			cmdOptionsShort[fmt.Sprintf("%s.%s", cmdName, shortOption)] = optionObj
+			cmdOptionsLong[fmt.Sprintf("%s.%s", cmdName, longOption)] = optionObj
 		}
 	}
 	// Add special flags
@@ -177,7 +181,7 @@ func ParseCmdOptions(cmdName string, commandsObjAttributes map[string]any, globa
 	specialOptionObj.Short = "-dry"
 	specialOptionObj.Long = "--dry-run"
 	cmdOptions["__dry_run__"] = specialOptionObj
-	
-	return cmdOptions, cmdOptionsHelp
+
+	return cmdOptions, cmdOptionsShort, cmdOptionsLong, cmdOptionsHelp
 
 }

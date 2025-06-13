@@ -12,7 +12,7 @@ import (
 )
 
 // Parse command-line arguments
-func parseArgs(cmdMap map[string]any, cmdMapHelp map[string]any, args []string) (string, map[string]string, error) {
+func parseArgs(cmdMap map[string]any, cmdMapShort map[string]any, cmdMapLong map[string]any, cmdMapHelp map[string]any, args []string) (string, map[string]string, error) {
 
 	// Initialize options map
 	options := make(map[string]string)
@@ -57,14 +57,20 @@ func parseArgs(cmdMap map[string]any, cmdMapHelp map[string]any, args []string) 
 	// Use a regular expression to match command-line flags/args
 	pattern := `^[\W]+[\w]`
 	re := regexp.MustCompile(pattern)
+	var argTypeOf string
 	for i := 2; i < len(args); i++ {
 		arg := args[i]
+		cmdMapArgKey := fmt.Sprintf("%s.%s", cmd, arg)
+		argMapObj, argMapObjExists := cmdMapShort[cmdMapArgKey]
+		if argMapObjExists {
+			argTypeOf = argMapObj.(*Option).TypeOf
+		}
 		if re.MatchString(arg) {
 			var key, value string
 			if strings.Contains(arg, "=") {
 				parts := strings.SplitN(arg, "=", 2)
 				key, value = parts[0], parts[1]
-			} else if i+1 < len(args) && re.MatchString(arg) {
+			} else if i+1 < len(args) && re.MatchString(arg) && argTypeOf != "bool" {
 				key, value = arg, args[i+1]
 				i++
 			} else {
@@ -273,6 +279,8 @@ func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[str
 		logger.Fatal("Invalid playbook structure - no commands key found")
 	}
 	var cmdStrings = []string{""}
+	var cmdMapShort = make(map[string]any)
+	var cmdMapLong = make(map[string]any)
 	var cmdMap = make(map[string]any)
 	var cmdMapHelp = make(map[string]any)
 	for cmdObjName, cmdObj := range cliCommands {
@@ -286,11 +294,11 @@ func MakeCLIFromAnsiblePlaybook(playbook string, args []string) (string, map[str
 			} else {
 				globalOptionsObjAttributes = make(map[string]any)
 			}
-			cmdMap[cmdName], cmdMapHelp[cmdName+".help"] = ParseCmdOptions(cmdName, commandsObjAttributes, globalOptionsObjAttributes)
+			cmdMap[cmdName], cmdMapShort, cmdMapLong, cmdMapHelp[cmdName+".help"] = ParseCmdOptions(cmdName, commandsObjAttributes, globalOptionsObjAttributes)
 		}
 	}
 
-	command, cliArgs, err := parseArgs(cmdMap, cmdMapHelp, args)
+	command, cliArgs, err := parseArgs(cmdMap, cmdMapShort, cmdMapLong, cmdMapHelp, args)
 	if err != nil {
 		logger.Fatal(fmt.Sprintf("Error: %s", err))
 	}
